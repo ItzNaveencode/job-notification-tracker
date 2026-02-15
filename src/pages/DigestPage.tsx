@@ -11,14 +11,23 @@ import { TYPOGRAPHY } from '../design-system/tokens/typography'
 import { JOBS } from '../data/jobs'
 import type { JobPreferences } from '../types/preferences'
 import { DEFAULT_PREFERENCES } from '../types/preferences'
-import { scoreJobs } from '../lib/matchingEngine'
 import { loadPreferences } from '../lib/preferences'
+import {
+    generateDigest,
+    getTodayKey,
+    loadDigest,
+    saveDigest,
+    formatDigestForClipboard,
+    formatDigestForEmail
+} from '../lib/digest'
 
 export function DigestPage() {
     // 1. Load preferences and dismissed jobs
     const [prefs, setPrefs] = useState<JobPreferences>(DEFAULT_PREFERENCES)
     const [dismissedJobIds, setDismissedJobIds] = useState<string[]>([])
     const [hasPreferences, setHasPreferences] = useState(false)
+    const [digest, setDigest] = useState<Job[] | null>(null)
+    const [isGenerating, setIsGenerating] = useState(false)
 
     useEffect(() => {
         const loadData = () => {
@@ -38,6 +47,13 @@ export function DigestPage() {
                 const dismissed = localStorage.getItem('jobTrackerDismissedJobs')
                 if (dismissed) setDismissedJobIds(JSON.parse(dismissed))
             } catch (e) { console.error(e) }
+
+            // Load today's digest
+            const todayKey = getTodayKey()
+            const todayDigest = loadDigest(todayKey)
+            if (todayDigest) {
+                setDigest(todayDigest)
+            }
         }
 
         loadData()
@@ -45,7 +61,7 @@ export function DigestPage() {
         return () => window.removeEventListener('storage', loadData)
     }, [])
 
-    // Basic Saved Jobs logic (for JobCard compatibility)
+    // Basic Saved Jobs logic
     const [savedJobIds, setSavedJobIds] = useState<string[]>([])
     useEffect(() => {
         try {
@@ -79,56 +95,40 @@ export function DigestPage() {
         }
     }
 
-    // 2. Digest Computation
-    const digestData = useMemo(() => {
-        if (!JOBS || !hasPreferences) return {
-            jobs: [],
-            totalEvaluated: 0,
-            passedThreshold: 0,
-            excludedDismissed: 0
-        }
+    // Handlers
+    const handleGenerate = () => {
+        setIsGenerating(true)
+        setTimeout(() => {
+            const newDigest = generateDigest(JOBS || [], prefs, dismissedJobIds)
+            const key = getTodayKey()
+            saveDigest(key, newDigest)
+            setDigest(newDigest)
+            setIsGenerating(false)
+        }, 800) // Simulated delay
+    }
 
-        const totalEvaluated = JOBS.length
-        let excludedDismissed = 0
-        let passedThreshold = 0
+    const handleCopy = () => {
+        if (!digest) return
+        const text = formatDigestForClipboard(digest)
+        navigator.clipboard.writeText(text)
+        alert('Digest copied to clipboard!')
+    }
 
-        // Step A: Calculate Match Scores using Engine
-        const scoredJobs = scoreJobs(JOBS, prefs)
+    const handleEmail = () => {
+        if (!digest) return
+        const body = formatDigestForEmail(digest)
+        const dateStr = new Date().toLocaleDateString()
+        window.location.href = `mailto:?subject=My 9AM Job Digest - ${dateStr}&body=${body}`
+    }
 
-        // Step B: Filter
-        const eligibleJobs = scoredJobs.filter(job => {
-            const isDismissed = dismissedJobIds.includes(job.id)
-            if (isDismissed) {
-                excludedDismissed++
-                return false
-            }
-
-            const passesThreshold = (job.matchScore || 0) >= prefs.minMatchScore
-            if (passesThreshold) {
-                passedThreshold++
-                return true
-            }
-            return false
-        })
-
-        // Step C: Sort and Limit
-        const topJobs = eligibleJobs.sort((a, b) => {
-            const scoreA = a.matchScore || 0;
-            const scoreB = b.matchScore || 0;
-
-            // 1. Score Descending
-            if (scoreB !== scoreA) return scoreB - scoreA
-            // 2. Date Posted Ascending (Newer first)
-            return a.postedDaysAgo - b.postedDaysAgo
-        }).slice(0, 10)
-
-        return {
-            jobs: topJobs,
-            totalEvaluated,
-            passedThreshold,
-            excludedDismissed
-        }
-    }, [JOBS, prefs, dismissedJobIds, hasPreferences])
+    // Live Preview Data (when digest not generated)
+    const previewData = useMemo(() => {
+        // Just use generateDigest logic but don't limit strictly yet, or mimic existing logic?
+        // Let's use existing logic for "Live Preview" so they see what they might get
+        // Actually, let's use the same filtered list so it feels consistent
+        // But we won't call it "Digest" yet.
+        return generateDigest(JOBS || [], prefs, dismissedJobIds)
+    }, [JOBS, prefs, dismissedJobIds])
 
     if (!hasPreferences) {
         return (
@@ -168,6 +168,145 @@ export function DigestPage() {
         )
     }
 
+    // ----------------------------------------------------------------
+    // STATE 1: DIGEST GENERATED (EMAIL VIEW)
+    // ----------------------------------------------------------------
+    if (digest) {
+        const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
+
+        return (
+            <div style={{ paddingBottom: SPACING.xl }}>
+                <ContextHeader
+                    title="Daily Digest"
+                    description="Your official 9AM snapshot"
+                />
+
+                <div style={{ maxWidth: '700px', margin: '0 auto', padding: `0 ${SPACING.md}` }}>
+
+                    {/* Actions Bar */}
+                    <div style={{ display: 'flex', gap: SPACING.md, marginBottom: SPACING.lg, justifyContent: 'flex-end' }}>
+                        <Button variant="secondary" onClick={handleCopy}>
+                            Copy to Clipboard
+                        </Button>
+                        <Button variant="secondary" onClick={handleEmail}>
+                            Create Email Draft
+                        </Button>
+                    </div>
+
+                    {/* Email Card Container */}
+                    <div style={{
+                        backgroundColor: '#FFFFFF',
+                        border: `1px solid ${COLORS.PrimaryText}10`,
+                        borderRadius: RADIUS.Default,
+                        padding: SPACING.xl,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+                    }}>
+                        {/* Header */}
+                        <div style={{ textAlign: 'center', marginBottom: SPACING.xl, borderBottom: `1px solid ${COLORS.PrimaryText}10`, paddingBottom: SPACING.lg }}>
+                            <h2 style={{
+                                fontFamily: TYPOGRAPHY.FontFamily.Serif,
+                                fontSize: TYPOGRAPHY.Size.H2,
+                                marginBottom: SPACING.xs
+                            }}>
+                                Top 10 Jobs For You
+                            </h2>
+                            <div style={{
+                                fontSize: '14px',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.1em',
+                                opacity: 0.6,
+                                fontWeight: 600
+                            }}>
+                                9AM Digest • {dateStr}
+                            </div>
+                        </div>
+
+                        {/* Job List */}
+                        {digest.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: SPACING.xl, opacity: 0.6 }}>
+                                No matching roles found today. Check your filters or try again tomorrow.
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.lg }}>
+                                {digest.map((job, idx) => (
+                                    <div key={job.id} style={{
+                                        borderBottom: idx < digest.length - 1 ? `1px solid ${COLORS.PrimaryText}05` : 'none',
+                                        paddingBottom: idx < digest.length - 1 ? SPACING.lg : 0
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.xs }}>
+                                            <h3 style={{
+                                                margin: 0,
+                                                fontSize: '18px',
+                                                fontFamily: TYPOGRAPHY.FontFamily.Base,
+                                                fontWeight: 600
+                                            }}>
+                                                {job.title}
+                                            </h3>
+                                            <span style={{
+                                                fontSize: '12px',
+                                                fontWeight: 600,
+                                                color: COLORS.Accent,
+                                                backgroundColor: `${COLORS.Accent}10`,
+                                                padding: '2px 8px',
+                                                borderRadius: '12px'
+                                            }}>
+                                                {job.matchScore}% Match
+                                            </span>
+                                        </div>
+
+                                        <div style={{ fontSize: '15px', color: COLORS.PrimaryText, opacity: 0.8, marginBottom: SPACING.sm }}>
+                                            {job.company} • {job.location} ({job.mode})
+                                        </div>
+
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: SPACING.sm }}>
+                                            <div style={{ fontSize: '13px', opacity: 0.6 }}>
+                                                {job.experience} • {job.salaryRange}
+                                            </div>
+                                            <a
+                                                href={job.applyUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                style={{
+                                                    textDecoration: 'none',
+                                                    color: COLORS.Accent,
+                                                    fontSize: '14px',
+                                                    fontWeight: 600
+                                                }}
+                                            >
+                                                Apply Now →
+                                            </a>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Footer */}
+                        <div style={{
+                            marginTop: SPACING.xl,
+                            paddingTop: SPACING.lg,
+                            borderTop: `1px solid ${COLORS.PrimaryText}10`,
+                            textAlign: 'center',
+                            fontSize: '12px',
+                            opacity: 0.5
+                        }}>
+                            This digest was generated based on your preferences using our intelligent matching engine.
+                            <br />
+                            © 2026 Job Notification Tracker
+                        </div>
+                    </div>
+
+                    <div style={{ textAlign: 'center', marginTop: SPACING.md, fontSize: '12px', opacity: 0.4 }}>
+                        Demo Mode: Daily 9AM trigger simulated manually.
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    // ----------------------------------------------------------------
+    // STATE 2: LIVE PREVIEW (NOT GENERATED)
+    // ----------------------------------------------------------------
     return (
         <div style={{ paddingBottom: SPACING.xl }}>
             <ContextHeader
@@ -176,57 +315,57 @@ export function DigestPage() {
             />
 
             <div style={{ maxWidth: '1200px', margin: '0 auto', padding: `0 ${SPACING.md}` }}>
-
-                {/* Metadata Panel */}
+                {/* Generation CTA */}
                 <div style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: SPACING.lg,
-                    marginBottom: SPACING.xl,
-                    padding: SPACING.md,
                     backgroundColor: '#FFFFFF',
+                    border: `1px solid ${COLORS.PrimaryText}10`,
                     borderRadius: RADIUS.Default,
-                    border: `1px solid ${COLORS.PrimaryText}10`
-                }}>
-                    <div style={{ flex: 1, minWidth: '200px' }}>
-                        <div style={{ fontSize: '12px', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Processed</div>
-                        <div style={{ fontSize: '24px', fontFamily: TYPOGRAPHY.FontFamily.Serif }}>{digestData.totalEvaluated} Roles</div>
-                    </div>
-                    <div style={{ flex: 1, minWidth: '200px' }}>
-                        <div style={{ fontSize: '12px', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Qualified Matches</div>
-                        <div style={{ fontSize: '24px', fontFamily: TYPOGRAPHY.FontFamily.Serif }}>{digestData.passedThreshold} Scored {prefs.minMatchScore}%+</div>
-                    </div>
-                    <div style={{ flex: 1, minWidth: '200px' }}>
-                        <div style={{ fontSize: '12px', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Hidden</div>
-                        <div style={{ fontSize: '24px', fontFamily: TYPOGRAPHY.FontFamily.Serif }}>{digestData.excludedDismissed} Dismissed</div>
-                    </div>
-                </div>
-
-                {/* List Header */}
-                <div style={{
+                    padding: SPACING.lg,
+                    marginBottom: SPACING.xl,
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'baseline',
-                    marginBottom: SPACING.md
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    textAlign: 'center',
+                    gap: SPACING.md
                 }}>
-                    <h2 style={{
-                        fontFamily: TYPOGRAPHY.FontFamily.Serif,
-                        fontSize: TYPOGRAPHY.Size.H2
-                    }}>
-                        Your Top Matches for Today
-                    </h2>
-                    <span style={{ fontSize: '14px', opacity: 0.6 }}>
-                        Threshold: {prefs.minMatchScore}% Match Score
-                    </span>
+                    <div>
+                        <h3 style={{ fontFamily: TYPOGRAPHY.FontFamily.Serif, fontSize: '20px', marginBottom: SPACING.xs }}>
+                            Ready for your digest?
+                        </h3>
+                        <p style={{ opacity: 0.7, maxWidth: '500px' }}>
+                            Generate your official 9AM snapshot based on your current preferences.
+                            This will create a static list you can copy or email.
+                        </p>
+                    </div>
+                    <Button
+                        onClick={handleGenerate}
+                        disabled={isGenerating}
+                        style={{ minWidth: '240px' }}
+                    >
+                        {isGenerating ? 'Generating...' : "Generate Today's 9AM Digest (Simulated)"}
+                    </Button>
+                    <div style={{ fontSize: '12px', opacity: 0.4 }}>
+                        Demo Mode: Daily 9AM trigger simulated manually.
+                    </div>
                 </div>
 
-                {/* Job Grid */}
+                {/* Preview Grid */}
+                <h3 style={{
+                    fontFamily: TYPOGRAPHY.FontFamily.Serif,
+                    fontSize: TYPOGRAPHY.Size.H3,
+                    marginBottom: SPACING.md,
+                    opacity: 0.5
+                }}>
+                    Live Preview ({previewData.length} Matches)
+                </h3>
+
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                    gap: SPACING.lg
+                    gap: SPACING.lg,
+                    opacity: 0.7 // Slight fade to indicate this is preview
                 }}>
-                    {digestData.jobs.map(job => (
+                    {previewData.map(job => (
                         <JobCard
                             key={job.id}
                             job={job}
@@ -237,7 +376,7 @@ export function DigestPage() {
                         />
                     ))}
 
-                    {digestData.jobs.length === 0 && (
+                    {previewData.length === 0 && (
                         <div style={{
                             gridColumn: '1 / -1',
                             textAlign: 'center',
@@ -246,7 +385,7 @@ export function DigestPage() {
                             border: `1px dashed ${COLORS.PrimaryText}20`,
                             borderRadius: RADIUS.Default
                         }}>
-                            No roles qualified for today’s digest. Adjust your preferences or lower your match threshold.
+                            No roles qualified for today’s digest. Adjust your preferences.
                         </div>
                     )}
                 </div>
