@@ -1,30 +1,24 @@
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { TopBar } from './layout/TopBar'
-import { ContextHeader } from './layout/ContextHeader'
-import { TwoColumnLayout } from './layout/TwoColumnLayout'
 import { ProofFooter } from './layout/ProofFooter'
+import { PlaceholderPage } from './pages/PlaceholderPage'
+import { NotFoundPage } from './pages/NotFoundPage'
 
 function App() {
   return (
     <>
       <TopBar />
 
-      <ContextHeader
-        title="Job Notification Tracker"
-        description="Track, manage, and verify your job application workflows in one structured workspace."
-      />
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<PlaceholderPage title="Dashboard" />} />
+        <Route path="/saved" element={<PlaceholderPage title="Saved" />} />
+        <Route path="/digest" element={<PlaceholderPage title="Digest" />} />
+        <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
+        <Route path="/proof" element={<PlaceholderPage title="Proof" />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
 
-      <TwoColumnLayout
-        leftContent={
-          <div>
-            Primary Workspace Area
-          </div>
-        }
-        rightContent={
-          <div>
-            Secondary Panel
-          </div>
-        }
-      />
       <ProofFooter />
     </>
   )
