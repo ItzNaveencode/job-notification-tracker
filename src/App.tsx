@@ -1,7 +1,12 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import { TopBar } from './layout/TopBar'
 import { ProofFooter } from './layout/ProofFooter'
-import { PlaceholderPage } from './pages/PlaceholderPage'
+import { LandingPage } from './pages/LandingPage'
+import { DashboardPage } from './pages/DashboardPage'
+import { SettingsPage } from './pages/SettingsPage'
+import { SavedPage } from './pages/SavedPage'
+import { DigestPage } from './pages/DigestPage'
+import { ProofPage } from './pages/ProofPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 function App() {
@@ -10,12 +15,12 @@ function App() {
       <TopBar />
 
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<PlaceholderPage title="Dashboard" />} />
-        <Route path="/saved" element={<PlaceholderPage title="Saved" />} />
-        <Route path="/digest" element={<PlaceholderPage title="Digest" />} />
-        <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
-        <Route path="/proof" element={<PlaceholderPage title="Proof" />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/saved" element={<SavedPage />} />
+        <Route path="/digest" element={<DigestPage />} />
+        <Route path="/proof" element={<ProofPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
 
