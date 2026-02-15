@@ -20,12 +20,12 @@ export function JobCard({ job, isSaved, onSave, onView, onDismiss }: JobCardProp
             display: 'flex',
             flexDirection: 'column',
             gap: SPACING.sm,
-            position: 'relative',
             height: '100%',
-            justifyContent: 'space-between'
+            justifyContent: 'space-between',
+            overflow: 'hidden'
         }}>
-            {/* Header */}
-            <div>
+            {/* Header and Content */}
+            <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                         {job.matchScore !== undefined && (
@@ -66,7 +66,8 @@ export function JobCard({ job, isSaved, onSave, onView, onDismiss }: JobCardProp
                         padding: '4px 8px',
                         borderRadius: RADIUS.Default,
                         color: COLORS.PrimaryText,
-                        whiteSpace: 'nowrap'
+                        whiteSpace: 'nowrap',
+                        marginLeft: SPACING.xs
                     }}>
                         {job.postedDaysAgo === 0 ? 'Today' : `${job.postedDaysAgo}d ago`}
                     </div>
@@ -95,12 +96,21 @@ export function JobCard({ job, isSaved, onSave, onView, onDismiss }: JobCardProp
                 alignItems: 'center',
                 marginTop: SPACING.md,
                 paddingTop: SPACING.sm,
-                borderTop: `1px solid ${COLORS.PrimaryText}10`
+                borderTop: `1px solid ${COLORS.PrimaryText}10`,
+                flexWrap: 'wrap',
+                gap: SPACING.sm
             }}>
-                <div style={{ fontSize: '12px', opacity: 0.5 }}>
+                <div style={{ fontSize: '12px', opacity: 0.5, marginBottom: SPACING.xs }}>
                     via {job.source}
                 </div>
-                <div style={{ display: 'flex', gap: SPACING.sm }}>
+                <div style={{
+                    display: 'flex',
+                    gap: SPACING.sm,
+                    flexWrap: 'wrap',
+                    justifyContent: 'flex-end',
+                    flex: 1,
+                    minWidth: '200px'
+                }}>
                     {onDismiss && (
                         <Button
                             variant="secondary"
