@@ -11,7 +11,6 @@ import { TYPOGRAPHY } from '../design-system/tokens/typography'
 import { JOBS } from '../data/jobs'
 import type { JobPreferences } from '../types/preferences'
 import { DEFAULT_PREFERENCES } from '../types/preferences'
-import { loadPreferences } from '../lib/preferences'
 import {
     generateDigest,
     getTodayKey,
@@ -31,14 +30,26 @@ export function DigestPage() {
 
     useEffect(() => {
         const loadData = () => {
-            const loadedPrefs = loadPreferences()
 
-            // Re-check existence in storage
-            const raw = localStorage.getItem('jobTrackerPreferences')
-            if (raw) {
-                setPrefs(loadedPrefs)
-                setHasPreferences(true)
-            } else {
+            // Re-check existence in storage with defensive validation
+            try {
+                const raw = localStorage.getItem('jobTrackerPreferences')
+                if (raw) {
+                    const parsed = JSON.parse(raw)
+                    // Ensure it has meaningful fields
+                    const hasFields = parsed.roleKeywords?.length > 0 || parsed.skills?.length > 0
+                    if (hasFields) {
+                        setPrefs(parsed)
+                        setHasPreferences(true)
+                    } else {
+                        setHasPreferences(false)
+                    }
+                } else {
+                    setPrefs(DEFAULT_PREFERENCES)
+                    setHasPreferences(false)
+                }
+            } catch (e) {
+                console.warn('Preferences corrupted, resetting', e)
                 setPrefs(DEFAULT_PREFERENCES)
                 setHasPreferences(false)
             }
@@ -48,12 +59,14 @@ export function DigestPage() {
                 if (dismissed) setDismissedJobIds(JSON.parse(dismissed))
             } catch (e) { console.error(e) }
 
-            // Load today's digest
-            const todayKey = getTodayKey()
-            const todayDigest = loadDigest(todayKey)
-            if (todayDigest) {
-                setDigest(todayDigest)
-            }
+            // Load today's digest safely
+            try {
+                const todayKey = getTodayKey()
+                const todayDigest = loadDigest(todayKey)
+                if (todayDigest) {
+                    setDigest(todayDigest)
+                }
+            } catch (e) { console.error("Digest load failed", e) }
         }
 
         loadData()
@@ -97,14 +110,28 @@ export function DigestPage() {
 
     // Handlers
     const handleGenerate = () => {
+        if (isGenerating) return
+
+        // Double check existence (Defensive)
+        const key = getTodayKey()
+        const existing = loadDigest(key)
+        if (existing) {
+            setDigest(existing)
+            return
+        }
+
         setIsGenerating(true)
         setTimeout(() => {
-            const newDigest = generateDigest(JOBS || [], prefs, dismissedJobIds)
-            const key = getTodayKey()
-            saveDigest(key, newDigest)
-            setDigest(newDigest)
-            setIsGenerating(false)
-        }, 800) // Simulated delay
+            try {
+                const newDigest = generateDigest(JOBS || [], prefs, dismissedJobIds)
+                saveDigest(key, newDigest)
+                setDigest(newDigest)
+            } catch (e) {
+                console.error("Generation failed", e)
+            } finally {
+                setIsGenerating(false)
+            }
+        }, 800)
     }
 
     const handleCopy = () => {
