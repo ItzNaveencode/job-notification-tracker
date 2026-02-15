@@ -1,35 +1,95 @@
+import { useState, useEffect } from 'react'
 import { ContextHeader } from '../layout/ContextHeader'
-import { TwoColumnLayout } from '../layout/TwoColumnLayout'
-import { COLORS } from '../design-system/tokens/colors'
-import { TYPOGRAPHY } from '../design-system/tokens/typography'
+import { JobCard } from '../components/JobCard'
+import { JobModal } from '../components/JobModal'
+import type { Job } from '../types/job'
 import { SPACING } from '../design-system/tokens/spacing'
+import { COLORS } from '../design-system/tokens/colors'
 import { RADIUS } from '../design-system/tokens/radius'
+import { JOBS } from '../data/jobs'
 
 export function SavedPage() {
+    const [savedJobs, setSavedJobs] = useState<Job[]>([])
+    const [selectedJob, setSelectedJob] = useState<Job | null>(null)
+    const [isModalOpen, setIsModalOpen] = useState(false)
+
+    useEffect(() => {
+        try {
+            if (!JOBS) return
+            const savedIds = JSON.parse(localStorage.getItem('savedJobIds') || '[]')
+            const jobs = JOBS.filter(job => savedIds.includes(job.id))
+            setSavedJobs(jobs)
+        } catch (e) {
+            console.error('Failed to load saved jobs', e)
+        }
+    }, [])
+
+    const handleUnsave = (id: string) => {
+        const newJobs = savedJobs.filter(j => j.id !== id)
+        setSavedJobs(newJobs)
+
+        const savedIds = newJobs.map(j => j.id)
+        localStorage.setItem('savedJobIds', JSON.stringify(savedIds))
+    }
+
+    const handleView = (id: string) => {
+        const job = JOBS?.find(j => j.id === id) || null
+        if (job) {
+            setSelectedJob(job)
+            setIsModalOpen(true)
+        }
+    }
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false)
+        setSelectedJob(null)
+    }
+
     return (
-        <>
+        <div style={{ paddingBottom: SPACING.xl }}>
             <ContextHeader
                 title="Saved Jobs"
                 description="Your curated list of opportunities"
             />
 
-            <TwoColumnLayout
-                leftContent={
+            <div style={{ maxWidth: '1200px', margin: '0 auto', padding: `0 ${SPACING.md}` }}>
+                {savedJobs.length > 0 ? (
                     <div style={{
-                        fontFamily: TYPOGRAPHY.FontFamily.Base,
-                        fontSize: TYPOGRAPHY.Size.Body,
-                        color: COLORS.PrimaryText,
-                        opacity: 0.6,
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                        gap: SPACING.lg
+                    }}>
+                        {savedJobs.map(job => (
+                            <JobCard
+                                key={job.id}
+                                job={job}
+                                isSaved={true}
+                                onSave={handleUnsave}
+                                onView={handleView}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div style={{
                         textAlign: 'center',
                         padding: SPACING.xl,
                         border: `1px dashed ${COLORS.PrimaryText}20`,
-                        borderRadius: RADIUS.Default
+                        borderRadius: RADIUS.Default,
+                        color: COLORS.PrimaryText,
+                        opacity: 0.6
                     }}>
                         <p>You haven't saved any jobs yet.</p>
                     </div>
-                }
-                rightContent={<div />}
-            />
-        </>
+                )}
+            </div>
+
+            {isModalOpen && selectedJob && (
+                <JobModal
+                    job={selectedJob}
+                    isOpen={isModalOpen}
+                    onClose={handleCloseModal}
+                />
+            )}
+        </div>
     )
 }
