@@ -11,9 +11,10 @@ interface JobCardProps {
     isSaved: boolean
     onSave: (id: string) => void
     onView: (id: string) => void
+    onDismiss?: (id: string) => void
 }
 
-export function JobCard({ job, isSaved, onSave, onView }: JobCardProps) {
+export function JobCard({ job, isSaved, onSave, onView, onDismiss }: JobCardProps) {
     return (
         <Card style={{
             display: 'flex',
@@ -27,6 +28,20 @@ export function JobCard({ job, isSaved, onSave, onView }: JobCardProps) {
             <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
+                        {job.matchScore !== undefined && (
+                            <div style={{
+                                display: 'inline-block',
+                                backgroundColor: job.matchScore >= 70 ? '#E6F4EA' : job.matchScore >= 40 ? '#FEF7E0' : '#FCE8E6',
+                                color: job.matchScore >= 70 ? '#137333' : job.matchScore >= 40 ? '#B06000' : '#C5221F',
+                                padding: '2px 8px',
+                                borderRadius: RADIUS.Default,
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                marginBottom: '8px'
+                            }}>
+                                {job.matchScore}% Match
+                            </div>
+                        )}
                         <h3 style={{
                             fontFamily: TYPOGRAPHY.FontFamily.Serif,
                             fontSize: TYPOGRAPHY.Size.H3,
@@ -86,6 +101,15 @@ export function JobCard({ job, isSaved, onSave, onView }: JobCardProps) {
                     via {job.source}
                 </div>
                 <div style={{ display: 'flex', gap: SPACING.sm }}>
+                    {onDismiss && (
+                        <Button
+                            variant="secondary"
+                            onClick={() => onDismiss(job.id)}
+                            style={{ opacity: 0.7 }}
+                        >
+                            Dismiss
+                        </Button>
+                    )}
                     <Button
                         variant="secondary"
                         onClick={() => onSave(job.id)}

@@ -11,4 +11,5 @@ export interface Job {
     salaryRange: string
     applyUrl: string
     description: string
+    matchScore?: number
 }
