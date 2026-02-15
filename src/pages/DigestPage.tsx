@@ -19,6 +19,64 @@ import {
     formatDigestForClipboard,
     formatDigestForEmail
 } from '../lib/digest'
+import { getStatusHistory, getStatusColor } from '../lib/status'
+import type { JobStatus } from '../lib/status'
+
+function RecentActivity() {
+    const [history, setHistory] = useState<{ job: Job, status: JobStatus, updatedAt: string }[]>([])
+
+    useEffect(() => {
+        const rawHistory = getStatusHistory()
+        const joined = rawHistory.map(h => {
+            const job = JOBS.find(j => j.id === h.jobId)
+            return job ? { job, status: h.status, updatedAt: h.updatedAt } : null
+        }).filter((item): item is { job: Job, status: JobStatus, updatedAt: string } => item !== null)
+
+        setHistory(joined)
+    }, [])
+
+    if (history.length === 0) return null
+
+    return (
+        <div style={{ marginTop: SPACING.xl, maxWidth: '700px', margin: `${SPACING.xl} auto 0`, padding: `0 ${SPACING.md}` }}>
+            <h3 style={{ fontFamily: TYPOGRAPHY.FontFamily.Serif, fontSize: TYPOGRAPHY.Size.H3, marginBottom: SPACING.md, opacity: 0.8 }}>
+                Recent Status Updates
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: SPACING.sm }}>
+                {history.map((item, idx) => (
+                    <div key={idx} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: SPACING.md,
+                        backgroundColor: COLORS.White,
+                        borderRadius: RADIUS.Default,
+                        border: `1px solid ${COLORS.PrimaryText}10`,
+                        borderLeft: `4px solid ${getStatusColor(item.status)}`
+                    }}>
+                        <div>
+                            <div style={{ fontWeight: 600, fontFamily: TYPOGRAPHY.FontFamily.Base }}>{item.job.title}</div>
+                            <div style={{ fontSize: '13px', opacity: 0.6 }}>{item.job.company}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                            <div style={{
+                                color: getStatusColor(item.status),
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                marginBottom: '2px'
+                            }}>
+                                {item.status}
+                            </div>
+                            <div style={{ fontSize: '11px', opacity: 0.4 }}>
+                                {new Date(item.updatedAt).toLocaleDateString()}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
 
 export function DigestPage() {
     // 1. Load preferences and dismissed jobs
@@ -327,6 +385,8 @@ export function DigestPage() {
                         Demo Mode: Daily 9AM trigger simulated manually.
                     </div>
                 </div>
+
+                <RecentActivity />
             </div>
         )
     }
@@ -425,6 +485,8 @@ export function DigestPage() {
                     onClose={() => setIsModalOpen(false)}
                 />
             )}
+
+            <RecentActivity />
         </div>
     )
 }

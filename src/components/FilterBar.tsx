@@ -12,6 +12,7 @@ interface FilterState {
     mode: string
     experience: string
     source: string
+    status?: string
     sort: string
 }
 
@@ -103,6 +104,18 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
                         <option value="Wellfound">Wellfound</option>
                         <option value="Fuel">Fuel</option>
                         <option value="Instahyre">Instahyre</option>
+                    </select>
+
+                    <select
+                        style={selectStyle}
+                        value={filters.status || ''}
+                        onChange={(e) => handleChange('status', e.target.value)}
+                    >
+                        <option value="">All Statuses</option>
+                        <option value="Not Applied">Not Applied</option>
+                        <option value="Applied">Applied</option>
+                        <option value="Rejected">Rejected</option>
+                        <option value="Selected">Selected</option>
                     </select>
 
                     <select

@@ -5,6 +5,8 @@ import { COLORS } from '../design-system/tokens/colors'
 import { SPACING } from '../design-system/tokens/spacing'
 import { TYPOGRAPHY } from '../design-system/tokens/typography'
 import { RADIUS } from '../design-system/tokens/radius'
+import { getStatusColor } from '../lib/status'
+import type { JobStatus } from '../lib/status'
 
 interface JobCardProps {
     job: Job
@@ -12,9 +14,11 @@ interface JobCardProps {
     onSave: (id: string) => void
     onView: (id: string) => void
     onDismiss?: (id: string) => void
+    status?: JobStatus
+    onStatusChange?: (id: string, status: JobStatus) => void
 }
 
-export function JobCard({ job, isSaved, onSave, onView, onDismiss }: JobCardProps) {
+export function JobCard({ job, isSaved, onSave, onView, onDismiss, status = 'Not Applied', onStatusChange }: JobCardProps) {
     return (
         <Card style={{
             display: 'flex',
@@ -22,7 +26,8 @@ export function JobCard({ job, isSaved, onSave, onView, onDismiss }: JobCardProp
             gap: SPACING.sm,
             height: '100%',
             justifyContent: 'space-between',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            borderLeft: status !== 'Not Applied' ? `4px solid ${getStatusColor(status)}` : undefined
         }}>
             {/* Header and Content */}
             <div style={{ flex: 1 }}>
@@ -87,6 +92,35 @@ export function JobCard({ job, isSaved, onSave, onView, onDismiss }: JobCardProp
                     <span>💼 {job.experience}</span>
                     <span>💰 {job.salaryRange}</span>
                 </div>
+
+                {/* Status Selector */}
+                {onStatusChange && (
+                    <div style={{ marginTop: SPACING.md }}>
+                        <select
+                            value={status}
+                            onChange={(e) => onStatusChange(job.id, e.target.value as JobStatus)}
+                            style={{
+                                width: '100%',
+                                padding: '6px 12px',
+                                borderRadius: RADIUS.Default,
+                                border: `1px solid ${getStatusColor(status)}${status === 'Not Applied' ? '40' : ''}`,
+                                backgroundColor: `${getStatusColor(status)}10`,
+                                color: getStatusColor(status),
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                outline: 'none',
+                                appearance: 'none', // Remove default arrow if desired, or keep it
+                                textAlign: 'center'
+                            }}
+                        >
+                            <option value="Not Applied">○ Not Applied</option>
+                            <option value="Applied">→ Applied</option>
+                            <option value="Rejected">✕ Rejected</option>
+                            <option value="Selected">✓ Selected</option>
+                        </select>
+                    </div>
+                )}
             </div>
 
             {/* Actions */}
@@ -94,7 +128,7 @@ export function JobCard({ job, isSaved, onSave, onView, onDismiss }: JobCardProp
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginTop: SPACING.md,
+                marginTop: SPACING.sm,
                 paddingTop: SPACING.sm,
                 borderTop: `1px solid ${COLORS.PrimaryText}10`,
                 flexWrap: 'wrap',

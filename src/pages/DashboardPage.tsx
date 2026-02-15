@@ -14,29 +14,37 @@ import { DEFAULT_PREFERENCES } from '../types/preferences'
 import { scoreJobs } from '../lib/matchingEngine'
 import { loadPreferences } from '../lib/preferences'
 
+import { Toast } from '../components/Toast'
+import { loadJobStatuses, saveJobStatus } from '../lib/status'
+import type { JobStatus, JobStatusMap } from '../lib/status'
+
 interface FilterState {
     keyword: string
     location: string
     mode: string
     experience: string
     source: string
+    status?: string // Add Status Filter
     sort: string
 }
 
 export function DashboardPage() {
-    // 1. Load preferences
+    // 1. Load preferences & Statuses
     const [prefs, setPrefs] = useState<JobPreferences>(DEFAULT_PREFERENCES)
     const [useThreshold, setUseThreshold] = useState(true)
+    const [statuses, setStatuses] = useState<JobStatusMap>({})
+    const [toastMsg, setToastMsg] = useState<string | null>(null)
 
     useEffect(() => {
-        const loadPrefs = () => {
-            const loaded = loadPreferences()
-            setPrefs(loaded)
+        const loadData = () => {
+            setPrefs(loadPreferences())
+            const loadedStatuses = loadJobStatuses()
+            setStatuses(loadedStatuses)
         }
 
-        loadPrefs()
-        window.addEventListener('storage', loadPrefs)
-        return () => window.removeEventListener('storage', loadPrefs)
+        loadData()
+        window.addEventListener('storage', loadData)
+        return () => window.removeEventListener('storage', loadData)
     }, [])
 
     const [filters, setFilters] = useState<FilterState>({
@@ -45,6 +53,7 @@ export function DashboardPage() {
         mode: '',
         experience: '',
         source: '',
+        status: '', // Default empty
         sort: 'latest' // Default sort: Latest
     })
 
@@ -54,7 +63,10 @@ export function DashboardPage() {
         try {
             const saved = localStorage.getItem('savedJobIds')
             if (saved) setSavedJobIds(JSON.parse(saved))
-        } catch (e) { console.error(e) }
+        } catch (e) {
+            console.error(e)
+            setSavedJobIds([])
+        }
     }, [])
 
     const handleSave = (id: string) => {
@@ -71,13 +83,30 @@ export function DashboardPage() {
         try {
             const dismissed = localStorage.getItem('jobTrackerDismissedJobs')
             if (dismissed) setDismissedJobIds(JSON.parse(dismissed))
-        } catch (e) { console.error(e) }
+        } catch (e) {
+            console.error(e)
+            setDismissedJobIds([])
+        }
     }, [])
 
     const handleDismiss = (id: string) => {
         const newDismissed = [...dismissedJobIds, id]
         setDismissedJobIds(newDismissed)
         localStorage.setItem('jobTrackerDismissedJobs', JSON.stringify(newDismissed))
+    }
+
+    // Status Change Logic
+    const handleStatusChange = (id: string, newStatus: JobStatus) => {
+        saveJobStatus(id, newStatus)
+        // Optimistic update
+        setStatuses(prev => ({
+            ...prev,
+            [id]: { status: newStatus, updatedAt: new Date().toISOString() }
+        }))
+
+        if (newStatus !== 'Not Applied') {
+            setToastMsg(`Status updated: ${newStatus}`)
+        }
     }
 
     // Modal logic
@@ -96,7 +125,6 @@ export function DashboardPage() {
         if (!JOBS) return { jobs: [], isFilteredOutByDismiss: false }
 
         // Step A: Calculate Match Scores based on loaded Preferences
-        // Step A: Calculate Match Scores based on loaded Preferences
         const scoredJobs = scoreJobs(JOBS, prefs)
 
         // Step B: Filter
@@ -111,6 +139,12 @@ export function DashboardPage() {
             if (filters.mode && job.mode !== filters.mode) return false
             if (filters.experience && job.experience !== filters.experience) return false
             if (filters.source && job.source !== filters.source) return false
+
+            // Status Filter
+            if (filters.status) {
+                const currentStatus = statuses[job.id]?.status || 'Not Applied'
+                if (currentStatus !== filters.status) return false
+            }
 
             // 2. Threshold Filter (Toggleable)
             if (useThreshold && (job.matchScore || 0) < prefs.minMatchScore) return false
@@ -135,7 +169,7 @@ export function DashboardPage() {
         })
 
         return { jobs: finalJobs, isFilteredOutByDismiss }
-    }, [prefs, filters, useThreshold, dismissedJobIds])
+    }, [prefs, filters, useThreshold, dismissedJobIds, statuses])
 
     return (
         <div style={{ paddingBottom: SPACING.xl }}>
@@ -189,6 +223,8 @@ export function DashboardPage() {
                             onSave={handleSave}
                             onView={handleView}
                             onDismiss={handleDismiss}
+                            status={statuses[job.id]?.status || 'Not Applied'}
+                            onStatusChange={handleStatusChange}
                         />
                     ))}
 
@@ -213,6 +249,10 @@ export function DashboardPage() {
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
                 />
+            )}
+
+            {toastMsg && (
+                <Toast message={toastMsg} onClose={() => setToastMsg(null)} />
             )}
         </div>
     )
